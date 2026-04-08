@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>组会 Duty 报告看板</title>
+    <style>
+        :root {
+            --bg-color: #f0f4f8;
+            --primary: #2563eb;
+            --accent: #ef4444;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: var(--bg-color);
+        }
+
+        .card {
+            background: white;
+            padding: 40px;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);
+            width: 450px;
+            text-align: center;
+        }
+
+        /* 顶部日期信息 */
+        .next-meeting-info {
+            margin-bottom: 30px;
+        }
+        .next-meeting-info .date-label {
+            font-size: 14px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .next-meeting-info .date-value {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--primary);
+            margin-top: 5px;
+        }
+
+        /* 轮盘容器 */
+        .wheel-area {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto 30px;
+        }
+
+        /* 背景装饰环 */
+        .outer-ring {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 2px dashed #e2e8f0;
+            box-sizing: border-box;
+        }
+
+        /* 名字标签层 */
+        .name-label {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: 140px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: 500;
+            color: #94a3b8;
+            transition: all 0.3s;
+        }
+
+        .name-label.active {
+            color: #1e293b;
+            font-weight: 800;
+            font-size: 20px;
+            transform: scale(1.1);
+        }
+
+        /* 指针光束 */
+        .light-beam {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 4px;
+            height: 100px;
+            background: linear-gradient(to top, var(--primary), transparent);
+            transform-origin: bottom center;
+            margin-top: -100px;
+            margin-left: -2px;
+            z-index: 5;
+            transition: transform 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .light-beam::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -3px;
+            width: 10px;
+            height: 10px;
+            background: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        /* 中央显示区 */
+        .center-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 110px;
+            height: 110px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .center-display .title { font-size: 12px; color: #94a3b8; }
+        .center-display .speaker { font-size: 18px; font-weight: 800; color: #1e293b; margin-top: 4px; }
+
+        .footer {
+            border-top: 1px solid #f1f5f9;
+            padding-top: 20px;
+            color: #64748b;
+            font-size: 14px;
+        }
+        .highlight-text { color: var(--accent); font-weight: 600; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="next-meeting-info">
+        <div class="date-label">下次组会 (Next Meeting)</div>
+        <div class="date-value" id="meetingDate">2026-04-09</div>
+    </div>
+
+    <div class="wheel-area">
+        <div class="outer-ring"></div>
+        <div id="labels-container"></div>
+        <div class="light-beam" id="beam"></div>
+        
+        <div class="center-display">
+            <span class="title">本周报告人</span>
+            <span class="speaker" id="currentSpeaker">-</span>
+        </div>
+    </div>
+
+    <div class="footer">
+        下周预告：<span id="nextSpeaker" class="highlight-text">-</span>
+    </div>
+</div>
+
+<script>
+    const members = [ "Yujie Cao", "Xiyuan Li","Weitao Lyu", "Jialin Sun", "Danny"];
+    const holidays = ["2026-01-01", "2026-02-19", "2026-10-01", "2026-10-08"];
+    
+    // 计算逻辑
+    function updateDashboard() {
+        const today = new Date(); // 当前 4月8号
+        
+        // 1. 寻找“下次组会”的日期（即明天或之后的第一个有效周四）
+        let nextMeetingDate = new Date(today);
+        while (true) {
+            nextMeetingDate.setDate(nextMeetingDate.getDate() + 1);
+            if (nextMeetingDate.getDay() === 4) { // 周四
+                let ds = nextMeetingDate.toISOString().split('T')[0];
+                if (!holidays.includes(ds)) break;
+            }
+        }
+        document.getElementById('meetingDate').innerText = nextMeetingDate.toISOString().split('T')[0];
+
+        // 2. 计算截至下次组会时，经历了多少个有效周四
+        let start = new Date("2026-01-01");
+        let validCount = 0;
+        let temp = new Date(start);
+        while (temp <= nextMeetingDate) {
+            if (temp.getDay() === 4) {
+                let ds = temp.toISOString().split('T')[0];
+                if (!holidays.includes(ds)) validCount++;
+            }
+            temp.setDate(temp.getDate() + 1);
+        }
+
+        const thisIdx = (validCount - 1) % members.length;
+        const nextIdx = (thisIdx + 1) % members.length;
+
+        // 3. 渲染名字
+        const container = document.getElementById('labels-container');
+        const step = 360 / members.length;
+        
+        members.forEach((name, i) => {
+            const label = document.createElement('div');
+            label.className = 'name-label' + (i === thisIdx ? ' active' : '');
+            
+            // 顺时针排列，0度在正上方
+            const angle = i * step;
+            const radius = 125; 
+            const radian = ((angle - 90) * Math.PI) / 180;
+            const x = Math.cos(radian) * radius;
+            const y = Math.sin(radian) * radius;
+            
+            label.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+            label.innerText = name;
+            container.appendChild(label);
+        });
+
+        // 4. 移动光束
+        document.getElementById('beam').style.transform = `rotate(${thisIdx * step}deg)`;
+        document.getElementById('currentSpeaker').innerText = members[thisIdx];
+        document.getElementById('nextSpeaker').innerText = members[nextIdx];
+    }
+
+    updateDashboard();
+</script>
+
+</body>
+</html>
