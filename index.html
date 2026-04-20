@@ -164,41 +164,58 @@
 </div>
 
 <script>
-    const members = [ "Yujie Cao", "Xiyuan Li", "Danny", "Jialin Sun","Weitao Lyu"];
+    const members = [ "Yujie Cao", "Xiyuan Li", "Danny", "Jialin Sun", "Weitao Lyu"];
     const holidays = ["2026-01-01", "2026-02-19", "2026-10-01", "2026-10-08"];
     
-    // 计算逻辑
+    // 辅助函数：安全地获取本地 YYYY-MM-DD 格式，避免使用 toISOString 导致的跨时区Bug
+    function getLocalDateString(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
     function updateDashboard() {
-        const today = new Date(); // 当前 4月8号
+        // 1. 获取当前日期，并强制把时分秒清零，避免比对时出现偏差
+        const today = new Date(); 
+        today.setHours(0, 0, 0, 0); 
         
-        // 1. 寻找“下次组会”的日期（即明天或之后的第一个有效周四）
+        // 寻找“下次组会”的日期（即明天或之后的第一个有效周四）
         let nextMeetingDate = new Date(today);
         while (true) {
             nextMeetingDate.setDate(nextMeetingDate.getDate() + 1);
             if (nextMeetingDate.getDay() === 4) { // 周四
-                let ds = nextMeetingDate.toISOString().split('T')[0];
+                let ds = getLocalDateString(nextMeetingDate);
                 if (!holidays.includes(ds)) break;
             }
         }
-        document.getElementById('meetingDate').innerText = nextMeetingDate.toISOString().split('T')[0];
+        document.getElementById('meetingDate').innerText = getLocalDateString(nextMeetingDate);
 
         // 2. 计算截至下次组会时，经历了多少个有效周四
-        let start = new Date("2026-01-01");
+        // 使用 new Date(年, 月, 日) 来避免解析字符串带来的时区偏移 (月份 0 代表 1月)
+        let start = new Date(2026, 0, 1);
+        start.setHours(0, 0, 0, 0); // 同样清零时分秒
+        
         let validCount = 0;
         let temp = new Date(start);
+        
         while (temp <= nextMeetingDate) {
             if (temp.getDay() === 4) {
-                let ds = temp.toISOString().split('T')[0];
-                if (!holidays.includes(ds)) validCount++;
+                let ds = getLocalDateString(temp);
+                if (!holidays.includes(ds)) {
+                    validCount++;
+                }
             }
             temp.setDate(temp.getDate() + 1);
         }
 
+        // 3. 计算轮换索引
         const thisIdx = (validCount - 1) % members.length;
         const nextIdx = (thisIdx + 1) % members.length;
 
-        // 3. 渲染名字
+        // 4. 渲染名字
         const container = document.getElementById('labels-container');
+        container.innerHTML = ''; // 清空已有标签以防重复渲染
         const step = 360 / members.length;
         
         members.forEach((name, i) => {
@@ -217,7 +234,7 @@
             container.appendChild(label);
         });
 
-        // 4. 移动光束
+        // 5. 移动光束并更新文本
         document.getElementById('beam').style.transform = `rotate(${thisIdx * step}deg)`;
         document.getElementById('currentSpeaker').innerText = members[thisIdx];
         document.getElementById('nextSpeaker').innerText = members[nextIdx];
