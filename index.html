@@ -165,6 +165,7 @@
 
 <script>
     const members = ["Yujie Cao", "Xiyuan Li", "Danny", "Jialin Sun","Weitao Lyu"];
+    const offset = 1;
     const holidays = ["2026-01-01", "2026-02-19", "2026-10-01", "2026-10-08"];
     
     // 辅助函数：安全地获取本地 YYYY-MM-DD 格式，避免使用 toISOString 导致的跨时区Bug
@@ -210,8 +211,9 @@
         }
 
         // 3. 计算轮换索引
-        const thisIdx = (validCount - 1) % members.length;
+        const thisIdx = (validCount - 1 + offset) % members.length;
         const nextIdx = (thisIdx + 1) % members.length;
+
 
         // 4. 渲染名字
         const container = document.getElementById('labels-container');
