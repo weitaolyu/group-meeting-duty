@@ -6,7 +6,7 @@
     <style>
         :root {
             --bg-color: #f0f4f8;
-            --primary: #2563eb;
+            --primary: #07c160; /* 改成微信绿，更契合场景 */
             --accent: #ef4444;
         }
 
@@ -82,14 +82,14 @@
         .footer { border-top: 1px solid #f1f5f9; padding-top: 20px; color: #64748b; font-size: 14px; }
         .highlight-text { color: var(--accent); font-weight: 600; }
 
-        /* 邮件提醒按钮���式 */
+        /* 微信提醒按钮样式 */
         .btn-notify {
             display: inline-block; margin-top: 15px; padding: 10px 24px;
             background-color: var(--primary); color: white; text-decoration: none;
             border-radius: 8px; font-weight: 600; font-size: 14px;
             transition: background 0.3s; cursor: pointer; border: none;
         }
-        .btn-notify:hover { background-color: #1d4ed8; }
+        .btn-notify:hover { background-color: #06ad56; }
     </style>
 </head>
 <body>
@@ -97,7 +97,7 @@
 <div class="card">
     <div class="next-meeting-info">
         <div class="date-label">下次组会 (Next Meeting)</div>
-        <div class="date-value" id="meetingDate">2026-04-09</div>
+        <div class="date-value" id="meetingDate">加载中...</div>
     </div>
 
     <div class="wheel-area">
@@ -113,23 +113,16 @@
 
     <div class="footer">
         下周预告：<span id="nextSpeaker" class="highlight-text">-</span><br>
-        <a id="notifyBtn" class="btn-notify" href="#">✉️ 邮件提醒本周报告人</a>
+        <button id="notifyBtn" class="btn-notify">📋 一键复制微信群提醒文案</button>
     </div>
 </div>
 
 <script>
     const members = [ "Yujie Cao", "Xiyuan Li", "Danny", "Jialin Sun", "Weitao Lyu"];
-    // 请在这里填入对应的邮箱地址（顺序必须与上方人员名字对应！）
-    const emails = [ 
-        "yujie.cao@example.com", 
-        "xiyuan.li@example.com", 
-        "danny@example.com", 
-        "jialin.sun@example.com", 
-        "weitao.lyu@example.com"
-    ];
     const holidays = ["2026-01-01", "2026-02-19", "2026-10-01", "2026-10-08"];
-    const offset = 1; // 用于校准错位的进度，1代表往后推一人
+    const offset = 1; // 用于校准进度：如果发现人慢了1周填1，慢了2周填2，快了1周填-1
     
+    // 安全地获取本地 YYYY-MM-DD 格式
     function getLocalDateString(date) {
         const y = date.getFullYear();
         const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -142,14 +135,14 @@
         const day = now.getDay(); // 0:周日, 1:周一 ... 4:周四, 5:周五, 6:周六
         const hour = now.getHours();
 
-        // 1. 核心逻辑：定义"轮换周期"。我们让一周的展示周期从 "周五17:00" 开始，到下周五 "16:59" 结束。
+        // 1. 核心逻辑：定义"轮换周期"从 "周五17:00" 开始，到下周五 "16:59" 结束。
         let diffToThursday = 0;
         if (day === 5 && hour >= 17) {
             diffToThursday = 6; // 如果是周五且过了 17:00，指向下周四
         } else if (day === 6) {
             diffToThursday = 5; // 如果是周六，指向下周四
         } else if (day === 5 && hour < 17) {
-            diffToThursday = -1; // 如果是周五但还没到 17:00，依然显示昨天的周四
+            diffToThursday = -1; // 如果是周五但还没到 17:00，依然显示刚过去的周四
         } else {
             diffToThursday = 4 - day; // 如果是周日到周四，指向本周四
         }
@@ -158,15 +151,16 @@
         targetThursday.setDate(targetThursday.getDate() + diffToThursday);
         targetThursday.setHours(0, 0, 0, 0);
 
-        // 处理节假日跳过逻辑：如果目标周四正好是节假日，顺延到下周
+        // 处理节假日跳过逻辑：如果目标周四正好是节假日，顺延到下个非节假日的周四
         let actualMeetingDate = new Date(targetThursday);
         while (holidays.includes(getLocalDateString(actualMeetingDate))) {
             actualMeetingDate.setDate(actualMeetingDate.getDate() + 7);
         }
 
-        document.getElementById('meetingDate').innerText = getLocalDateString(actualMeetingDate);
+        const meetingDateStr = getLocalDateString(actualMeetingDate);
+        document.getElementById('meetingDate').innerText = meetingDateStr;
 
-        // 2. 计算从年初到这个 targetThursday 一共有多少个有效的组会日
+        // 2. 计算从年初到这个 actualMeetingDate 一共有多少个有效的组会日
         let start = new Date(2026, 0, 1);
         start.setHours(0, 0, 0, 0);
         let validCount = 0;
@@ -180,11 +174,12 @@
             temp.setDate(temp.getDate() + 1);
         }
 
-        // 3. 计算本周索引
-        const thisIdx = (validCount - 1 + offset) % members.length;
+        // 3. 计算本周索引 (加入 offset 校准)
+        // 考虑到 JavaScript 中负数取模的 bug，加上 members.length 确保结果为正
+        const thisIdx = (((validCount - 1 + offset) % members.length) + members.length) % members.length;
         const nextIdx = (thisIdx + 1) % members.length;
 
-        // 4. 渲染名字
+        // 4. 渲染名字环绕
         const container = document.getElementById('labels-container');
         container.innerHTML = ''; 
         const step = 360 / members.length;
@@ -204,32 +199,26 @@
 
         // 5. 更新指针与文本
         document.getElementById('beam').style.transform = `rotate(${thisIdx * step}deg)`;
-        document.getElementById('currentSpeaker').innerText = members[thisIdx];
+        const speakerName = members[thisIdx];
+        document.getElementById('currentSpeaker').innerText = speakerName;
         document.getElementById('nextSpeaker').innerText = members[nextIdx];
 
-        // 6. 配置微信群复制文案按钮
+        // 6. 绑定复制微信文案按钮功能
         const notifyBtn = document.getElementById('notifyBtn');
-        const meetingDateStr = getLocalDateString(actualMeetingDate);
-        const speakerName = members[thisIdx];
-        
-        // 修改按钮文字
-        notifyBtn.innerText = '📋 一键复制微信群提醒文案';
-        notifyBtn.href = '#';
-        
-        // 绑定点击复制事件
         notifyBtn.onclick = function(e) {
-            e.preventDefault(); // 阻止默认跳转
+            e.preventDefault();
             
-            // 组装要在微信群里发的文案
+            // 组装要在微信群里发的文案 (可以根据你们实验室习惯修改)
             const text = `【组会报告提醒】🔔\n下一次组会 (${meetingDateStr}) 的报告人是：@${speakerName} \n请提前做好准备哦！`;
             
-            // 写入剪贴板
+            // 写入系统剪贴板
             navigator.clipboard.writeText(text).then(() => {
                 alert('✅ 文案已成功复制！\n\n请直接打开微信群，长按或 Ctrl+V 粘贴发送吧~');
             }).catch(err => {
-                alert('复制失败，请手动记录。');
+                alert('复制失败，可能是浏览器权限限制，请手动记录。');
             });
         };
+    }
 
     updateDashboard();
 </script>
